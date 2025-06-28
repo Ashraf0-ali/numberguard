@@ -6,7 +6,6 @@ import {
   getDocs, 
   query, 
   where, 
-  orderBy, 
   deleteDoc, 
   doc, 
   updateDoc,
@@ -41,8 +40,7 @@ export const useContacts = () => {
       
       const q = query(
         collection(db, 'contacts'),
-        where('user_id', '==', user.uid),
-        orderBy('date_added', 'desc')
+        where('user_id', '==', user.uid)
       );
       
       const querySnapshot = await getDocs(q);
@@ -51,8 +49,16 @@ export const useContacts = () => {
         ...doc.data()
       })) as Contact[];
       
-      console.log('Fetched contacts:', contactsData);
-      setContacts(contactsData);
+      // Sort contacts by date_added in descending order after fetching
+      const sortedContacts = contactsData.sort((a, b) => {
+        if (!a.date_added || !b.date_added) return 0;
+        const dateA = a.date_added.toDate ? a.date_added.toDate() : new Date(a.date_added);
+        const dateB = b.date_added.toDate ? b.date_added.toDate() : new Date(b.date_added);
+        return dateB.getTime() - dateA.getTime();
+      });
+      
+      console.log('Fetched contacts:', sortedContacts);
+      setContacts(sortedContacts);
     } catch (error: any) {
       console.error('Error fetching contacts:', error);
       toast({
