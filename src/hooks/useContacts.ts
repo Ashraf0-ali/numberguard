@@ -37,6 +37,8 @@ export const useContacts = () => {
     
     try {
       setLoading(true);
+      console.log('Fetching contacts for user:', user.uid);
+      
       const q = query(
         collection(db, 'contacts'),
         where('user_id', '==', user.uid),
@@ -49,11 +51,13 @@ export const useContacts = () => {
         ...doc.data()
       })) as Contact[];
       
+      console.log('Fetched contacts:', contactsData);
       setContacts(contactsData);
     } catch (error: any) {
+      console.error('Error fetching contacts:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch contacts",
+        description: "Failed to fetch contacts: " + error.message,
         variant: "destructive",
       });
     } finally {
@@ -73,23 +77,28 @@ export const useContacts = () => {
 
     try {
       setLoading(true);
+      console.log('Adding contact for user:', user.uid, contactData);
+      
       const newContact = {
         ...contactData,
         user_id: user.uid,
         date_added: serverTimestamp()
       };
       
-      await addDoc(collection(db, 'contacts'), newContact);
+      const docRef = await addDoc(collection(db, 'contacts'), newContact);
+      console.log('Contact added with ID:', docRef.id);
+      
       toast({
         title: "Success",
         description: "Contact added successfully!",
       });
       
-      fetchContacts();
+      await fetchContacts();
     } catch (error: any) {
+      console.error('Error adding contact:', error);
       toast({
         title: "Error",
-        description: "Failed to add contact",
+        description: "Failed to add contact: " + error.message,
         variant: "destructive",
       });
     } finally {
@@ -100,6 +109,8 @@ export const useContacts = () => {
   const updateContact = async (contactId: string, contactData: Partial<Contact>) => {
     try {
       setLoading(true);
+      console.log('Updating contact:', contactId, contactData);
+      
       const contactRef = doc(db, 'contacts', contactId);
       await updateDoc(contactRef, contactData);
       
@@ -108,11 +119,12 @@ export const useContacts = () => {
         description: "Contact updated successfully!",
       });
       
-      fetchContacts();
+      await fetchContacts();
     } catch (error: any) {
+      console.error('Error updating contact:', error);
       toast({
         title: "Error",
-        description: "Failed to update contact",
+        description: "Failed to update contact: " + error.message,
         variant: "destructive",
       });
     } finally {
@@ -123,6 +135,8 @@ export const useContacts = () => {
   const deleteContact = async (contactId: string) => {
     try {
       setLoading(true);
+      console.log('Deleting contact:', contactId);
+      
       await deleteDoc(doc(db, 'contacts', contactId));
       
       toast({
@@ -130,11 +144,12 @@ export const useContacts = () => {
         description: "Contact deleted successfully!",
       });
       
-      fetchContacts();
+      await fetchContacts();
     } catch (error: any) {
+      console.error('Error deleting contact:', error);
       toast({
         title: "Error",
-        description: "Failed to delete contact",
+        description: "Failed to delete contact: " + error.message,
         variant: "destructive",
       });
     } finally {
