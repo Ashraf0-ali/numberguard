@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useContacts, Contact } from '@/hooks/useContacts';
+import { useLanguage } from '@/contexts/LanguageContext';
 import ContactCard from './ContactCard';
 import ContactForm from './ContactForm';
 import AIStoryMode from './AIStoryMode';
@@ -14,6 +15,7 @@ const ContactList = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const { contacts, loading, deleteContact, searchContacts } = useContacts();
+  const { language, t } = useLanguage();
 
   const filteredContacts = searchContacts(searchTerm);
 
@@ -42,8 +44,12 @@ const ContactList = () => {
             <Users className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">My Contacts</h2>
-            <p className="text-gray-600 dark:text-gray-400">{contacts.length} contacts saved</p>
+            <h2 className={`text-2xl font-bold text-gray-800 dark:text-gray-200 ${language === 'bn' ? 'font-bangla' : 'font-poppins'}`}>
+              {t('myContacts')}
+            </h2>
+            <p className={`text-gray-600 dark:text-gray-400 ${language === 'bn' ? 'font-bangla' : 'font-inter'}`}>
+              {contacts.length} {t('contactsSaved')}
+            </p>
           </div>
         </div>
       </div>
@@ -51,13 +57,13 @@ const ContactList = () => {
       {/* Tabs for different modes */}
       <Tabs defaultValue="contacts" className="w-full">
         <TabsList className="grid w-full grid-cols-2 bg-white/80 dark:bg-gray-800/80">
-          <TabsTrigger value="contacts" className="flex items-center gap-2">
+          <TabsTrigger value="contacts" className={`flex items-center gap-2 ${language === 'bn' ? 'font-bangla' : 'font-inter'}`}>
             <Users className="h-4 w-4" />
-            Contacts
+            {t('contacts')}
           </TabsTrigger>
-          <TabsTrigger value="ai-story" className="flex items-center gap-2">
+          <TabsTrigger value="ai-story" className={`flex items-center gap-2 ${language === 'bn' ? 'font-bangla' : 'font-inter'}`}>
             <Brain className="h-4 w-4" />
-            AI Story Mode
+            {t('aiStoryMode')}
           </TabsTrigger>
         </TabsList>
         
@@ -67,19 +73,19 @@ const ContactList = () => {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder="Search contacts by name, number, or tags..."
+                placeholder={t('searchPlaceholder')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-sm focus:ring-2 focus:ring-blue-500"
+                className={`pl-10 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-sm focus:ring-2 focus:ring-blue-500 ${language === 'bn' ? 'font-bangla' : 'font-inter'}`}
               />
             </div>
             
             <Button
               onClick={() => setIsFormOpen(true)}
-              className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 transition-all duration-200"
+              className={`bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 ${language === 'bn' ? 'font-bangla' : 'font-inter'}`}
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Contact
+              {t('addContact')}
             </Button>
           </div>
 
@@ -87,7 +93,9 @@ const ContactList = () => {
           {loading && (
             <div className="text-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-              <p className="text-gray-600 dark:text-gray-400 mt-2">Loading contacts...</p>
+              <p className={`text-gray-600 dark:text-gray-400 mt-2 ${language === 'bn' ? 'font-bangla' : 'font-inter'}`}>
+                {t('loading')}
+              </p>
             </div>
           )}
 
