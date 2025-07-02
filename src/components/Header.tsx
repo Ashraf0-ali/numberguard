@@ -18,7 +18,7 @@ const Header = () => {
               <Shield className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
                 NumberGuard AI
               </h1>
               <p className="text-xs text-gray-600 dark:text-gray-400">Secure Contact Management</p>

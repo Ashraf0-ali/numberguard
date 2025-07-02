@@ -11,9 +11,13 @@ export const extractContactFromStory = async (story: string): Promise<ExtractedC
   const phoneRegex = /(?:\+?88)?[01]?[3-9]\d{8,10}|\d{11}/g;
   const phoneMatches = story.match(phoneRegex);
   
-  // Extract potential names (capitalized words, common Bengali names)
-  const nameRegex = /\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g;
-  const nameMatches = story.match(nameRegex);
+  // Extract potential names (both English and Bengali)
+  const englishNameRegex = /\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g;
+  const bengaliNameRegex = /[অ-হ][অ-হ\u09be-\u09ff]{1,}(?:\s+[অ-হ][অ-হ\u09be-\u09ff]{1,})*/g;
+  
+  const englishNames = story.match(englishNameRegex) || [];
+  const bengaliNames = story.match(bengaliNameRegex) || [];
+  const nameMatches = [...englishNames, ...bengaliNames];
   
   // Extract tags based on common keywords
   const tagKeywords = {
