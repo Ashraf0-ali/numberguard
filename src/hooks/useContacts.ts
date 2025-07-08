@@ -195,10 +195,10 @@ export const useContacts = () => {
       );
 
       const unsubscribe = onSnapshot(contactsQuery, (snapshot) => {
-        const contactsData: Contact[] = [];
+        const firebaseContacts: Contact[] = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
-          contactsData.push({
+          firebaseContacts.push({
             id: doc.id,
             name: data.name,
             number: data.number,
@@ -209,12 +209,32 @@ export const useContacts = () => {
           });
         });
         
-        // Merge with local data and remove duplicates
-        const localContacts = contacts.filter(c => !c.synced);
-        const allContacts = [...contactsData, ...localContacts];
+        // Get current local contacts
+        const stored = localStorage.getItem(getUserStorageKey());
+        const localContacts: Contact[] = stored ? JSON.parse(stored) : [];
         
-        setContacts(allContacts);
-        saveToLocalStorage(allContacts);
+        // Merge Firebase and local contacts, prioritizing Firebase data
+        const contactMap = new Map();
+        
+        // Add Firebase contacts first
+        firebaseContacts.forEach(contact => {
+          contactMap.set(contact.id, contact);
+        });
+        
+        // Add local contacts that don't conflict with Firebase
+        localContacts.forEach(contact => {
+          if (!contactMap.has(contact.id)) {
+            contactMap.set(contact.id, contact);
+          }
+        });
+        
+        const mergedContacts = Array.from(contactMap.values()).sort((a, b) => {
+          if (!a.date_added || !b.date_added) return 0;
+          return new Date(b.date_added).getTime() - new Date(a.date_added).getTime();
+        });
+        
+        setContacts(mergedContacts);
+        saveToLocalStorage(mergedContacts);
         setLoading(false);
       }, (error) => {
         console.error('Error fetching from Firebase:', error);
