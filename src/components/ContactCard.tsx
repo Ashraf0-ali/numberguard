@@ -31,29 +31,14 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) 
   };
 
   const handleCall = () => {
-    const phoneNumber = contact.number.replace(/\D/g, '');
-    
-    // Check if device supports tel: links (mobile devices)
-    const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-      window.location.href = `tel:${phoneNumber}`;
-    } else {
-      // For desktop, copy number to clipboard and show toast
-      navigator.clipboard.writeText(phoneNumber).then(() => {
-        // You'll need to import useToast hook
-      }).catch(() => {
-        // Fallback for older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = phoneNumber;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-      });
-      
-      // Show alert as fallback
-      alert(`Phone number copied: ${formatPhoneNumber(contact.number)}`);
+    // Always use tel: protocol for mobile dial pad
+    window.location.href = `tel:${contact.number}`;
+  };
+
+  const handleDelete = () => {
+    console.log('Delete button clicked for contact:', contact.id);
+    if (contact.id) {
+      onDelete(contact.id);
     }
   };
 
@@ -102,7 +87,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) 
             <Button
               size="sm"
               variant="outline"
-              onClick={() => contact.id && onDelete(contact.id)}
+              onClick={handleDelete}
               className="h-5 w-5 p-0 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 hover:text-red-600 border-gray-300 dark:border-gray-600"
             >
               <Trash2 className="h-2.5 w-2.5" />

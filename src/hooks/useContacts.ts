@@ -122,10 +122,15 @@ export const useContacts = () => {
   };
 
   const deleteContact = (contactId: string) => {
+    console.log('deleteContact called with ID:', contactId);
+    console.log('Current contacts:', contacts);
+    
     try {
       setLoading(true);
       
       const updatedContacts = contacts.filter(contact => contact.id !== contactId);
+      console.log('Updated contacts after filter:', updatedContacts);
+      
       setContacts(updatedContacts);
       saveContacts(updatedContacts);
       
