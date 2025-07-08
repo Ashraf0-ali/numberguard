@@ -30,42 +30,59 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) 
     return number;
   };
 
-  const handleCall = () => {
-    console.log('Call button clicked for:', contact.number);
-    // Try multiple methods for better mobile app compatibility
-    try {
-      // Method 1: Direct tel: protocol (works in most mobile apps)
-      window.location.href = `tel:${contact.number}`;
-    } catch (error) {
-      console.error('Error with tel: protocol:', error);
-      // Method 2: Try using window.open as fallback
-      try {
-        window.open(`tel:${contact.number}`, '_system');
-      } catch (error2) {
-        console.error('Error with window.open:', error2);
-        // Method 3: Try creating a link element and clicking it
-        const link = document.createElement('a');
-        link.href = `tel:${contact.number}`;
-        link.click();
-      }
-    }
-  };
-
-  const handleDelete = (e) => {
+  const handleCall = (e: React.MouseEvent) => {
+    // Prevent any default behavior or propagation that might interfere
     e.preventDefault();
     e.stopPropagation();
-    console.log('Delete button clicked for contact:', contact.id);
-    console.log('onDelete function:', onDelete);
     
-    if (contact.id && onDelete) {
+    console.log('Call button clicked for:', contact.number);
+    
+    // For mobile apps, we need to be more direct with the tel: protocol
+    // Using a direct approach first
+    const phoneNumber = contact.number.replace(/\s+/g, '');
+    
+    // Create and click an anchor element - most reliable cross-platform method
+    const link = document.createElement('a');
+    link.href = `tel:${phoneNumber}`;
+    link.setAttribute('target', '_system'); // for Capacitor/Cordova compatibility
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Fallbacks if the above doesn't work
+    setTimeout(() => {
       try {
-        onDelete(contact.id);
-        console.log('Delete function called successfully');
+        window.location.href = `tel:${phoneNumber}`;
       } catch (error) {
-        console.error('Error calling delete function:', error);
+        console.error('Primary call method failed, trying fallback:', error);
+        try {
+          window.open(`tel:${phoneNumber}`, '_system');
+        } catch (error2) {
+          console.error('All call methods failed:', error2);
+        }
       }
-    } else {
-      console.log('Missing contact.id or onDelete function');
+    }, 100);
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    // Prevent event bubbling and default behavior
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log('Delete button clicked for contact:', contact.id);
+    
+    // Confirm before deleting - this provides better UX and ensures the action was intentional
+    if (window.confirm('Are you sure you want to delete this contact?')) {
+      if (contact.id && onDelete) {
+        try {
+          onDelete(contact.id);
+          console.log('Delete function called successfully');
+        } catch (error) {
+          console.error('Error calling delete function:', error);
+        }
+      } else {
+        console.log('Missing contact.id or onDelete function');
+      }
     }
   };
 
@@ -94,20 +111,25 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) 
             )}
           </div>
           
-          <div className="flex gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 ml-1">
+          {/* Always show buttons on mobile, show on hover for desktop */}
+          <div className="flex gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 ml-1 z-10">
             <Button
               size="sm"
               variant="outline"
               onClick={handleCall}
-              className="h-5 w-5 p-0 hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-300 hover:text-green-600 border-gray-300 dark:border-gray-600"
+              className="h-5 w-5 p-0 hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-300 hover:text-green-600 border-gray-300 dark:border-gray-600 active:bg-green-100 dark:active:bg-green-800/30"
             >
               <PhoneCall className="h-2.5 w-2.5" />
             </Button>
             <Button
               size="sm"
               variant="outline"
-              onClick={() => onEdit(contact)}
-              className="h-5 w-5 p-0 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 border-gray-300 dark:border-gray-600"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onEdit(contact);
+              }}
+              className="h-5 w-5 p-0 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 border-gray-300 dark:border-gray-600 active:bg-blue-100 dark:active:bg-blue-800/30"
             >
               <Edit className="h-2.5 w-2.5" />
             </Button>
@@ -115,7 +137,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) 
               size="sm"
               variant="outline"
               onClick={handleDelete}
-              className="h-5 w-5 p-0 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 hover:text-red-600 border-gray-300 dark:border-gray-600"
+              className="h-5 w-5 p-0 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300 hover:text-red-600 border-gray-300 dark:border-gray-600 active:bg-red-100 dark:active:bg-red-800/30"
             >
               <Trash2 className="h-2.5 w-2.5" />
             </Button>
