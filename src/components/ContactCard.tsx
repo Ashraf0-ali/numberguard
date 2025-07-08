@@ -31,57 +31,63 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) 
   };
 
   const handleCall = (e: React.MouseEvent) => {
-    // Prevent any default behavior or propagation that might interfere
+    // Prevent default behavior and stop propagation
     e.preventDefault();
     e.stopPropagation();
     
     console.log('Call button clicked for:', contact.number);
     
-    // For mobile apps, we need to be more direct with the tel: protocol
-    // Using a direct approach first
+    // Clean the phone number
     const phoneNumber = contact.number.replace(/\s+/g, '');
     
-    // Create and click an anchor element - most reliable cross-platform method
-    const link = document.createElement('a');
-    link.href = `tel:${phoneNumber}`;
-    link.setAttribute('target', '_system'); // for Capacitor/Cordova compatibility
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Fallbacks if the above doesn't work
-    setTimeout(() => {
-      try {
-        window.location.href = `tel:${phoneNumber}`;
-      } catch (error) {
-        console.error('Primary call method failed, trying fallback:', error);
-        try {
-          window.open(`tel:${phoneNumber}`, '_system');
-        } catch (error2) {
-          console.error('All call methods failed:', error2);
+    // Try multiple methods to initiate a call for better cross-platform compatibility
+    try {
+      // Method 1: Direct link approach
+      const link = document.createElement('a');
+      link.href = `tel:${phoneNumber}`;
+      link.setAttribute('target', '_system'); // for mobile apps
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => document.body.removeChild(link), 100);
+      
+      // Method 2: Window location approach (fallback)
+      setTimeout(() => {
+        if (window.location.href.indexOf('tel:') === -1) {
+          window.location.href = `tel:${phoneNumber}`;
         }
-      }
-    }, 100);
+      }, 200);
+      
+      // Method 3: Window open approach (second fallback)
+      setTimeout(() => {
+        window.open(`tel:${phoneNumber}`, '_system');
+      }, 300);
+      
+    } catch (error) {
+      console.error('All call methods failed:', error);
+      alert('Unable to initiate call. Please dial manually: ' + phoneNumber);
+    }
   };
 
   const handleDelete = (e: React.MouseEvent) => {
-    // Prevent event bubbling and default behavior
+    // Prevent default behavior and stop propagation
     e.preventDefault();
     e.stopPropagation();
     
     console.log('Delete button clicked for contact:', contact.id);
     
-    // Confirm before deleting - this provides better UX and ensures the action was intentional
-    if (window.confirm('Are you sure you want to delete this contact?')) {
+    // Confirm before deleting
+    if (window.confirm(`Are you sure you want to delete ${contact.name}?`)) {
       if (contact.id && onDelete) {
         try {
           onDelete(contact.id);
-          console.log('Delete function called successfully');
+          console.log('Contact deleted successfully');
         } catch (error) {
-          console.error('Error calling delete function:', error);
+          console.error('Error deleting contact:', error);
+          alert('Failed to delete contact. Please try again.');
         }
       } else {
-        console.log('Missing contact.id or onDelete function');
+        console.error('Missing contact.id or onDelete function');
+        alert('Unable to delete contact due to missing information.');
       }
     }
   };
@@ -111,8 +117,8 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) 
             )}
           </div>
           
-          {/* Always show buttons on mobile, show on hover for desktop */}
-          <div className="flex gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 ml-1 z-10">
+          {/* Always show buttons on mobile and desktop */}
+          <div className="flex gap-0.5 opacity-100 transition-opacity duration-200 ml-1 z-10">
             <Button
               size="sm"
               variant="outline"
