@@ -1,4 +1,5 @@
-const CACHE_NAME = 'numberguard-v2';
+
+const CACHE_NAME = 'numberguard-v3';  // Updated cache version
 const urlsToCache = [
   '/',
   '/index.html',
@@ -45,6 +46,13 @@ self.addEventListener('activate', event => {
 
 // Fetch event - respond with cached resources or fetch from network
 self.addEventListener('fetch', event => {
+  // Don't cache Firebase API calls and other critical APIs
+  if (event.request.url.includes('firestore.googleapis.com') || 
+      event.request.url.includes('identitytoolkit.googleapis.com') || 
+      event.request.url.includes('securetoken.googleapis.com')) {
+    return;
+  }
+  
   event.respondWith(
     caches.match(event.request)
       .then(cachedResponse => {
@@ -81,19 +89,58 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// Handle offline syncing messages from the app
-self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'SYNC_CONTACTS') {
-    console.log('Service Worker received sync request');
-    // Notify all open clients that a sync is needed
-    self.clients.matchAll()
-      .then(clients => {
-        clients.forEach(client => {
-          client.postMessage({
-            type: 'TRIGGER_SYNC',
-            timestamp: new Date().getTime()
-          });
-        });
+// Background sync registration
+self.addEventListener('sync', function(event) {
+  console.log('Background sync event triggered:', event.tag);
+  
+  if (event.tag === 'sync-contacts') {
+    event.waitUntil(syncContacts());
+  }
+});
+
+// Helper function to perform contact synchronization
+async function syncContacts() {
+  console.log('Starting background sync for contacts');
+  
+  // Notify all clients that a sync is needed
+  self.clients.matchAll().then(clients => {
+    clients.forEach(client => {
+      client.postMessage({
+        type: 'SYNC_NEEDED',
+        timestamp: new Date().getTime()
       });
+    });
+  });
+
+  // Return success to resolve the event
+  return Promise.resolve();
+}
+
+// Handle sync messages from the app
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'REGISTER_SYNC') {
+    console.log('Service Worker received register sync request');
+    
+    // Try to register for sync
+    if ('SyncManager' in self) {
+      self.registration.sync.register('sync-contacts')
+        .then(() => {
+          console.log('Sync registration successful');
+          // Notify the client that sync was registered
+          event.source.postMessage({
+            type: 'SYNC_REGISTERED',
+            success: true
+          });
+        })
+        .catch(error => {
+          console.error('Sync registration failed:', error);
+          // Fallback for when sync registration fails
+          syncContacts();
+        });
+    } else {
+      console.log('Background Sync not supported, performing manual sync');
+      // Fallback for browsers that don't support background sync
+      syncContacts();
+    }
   }
 });

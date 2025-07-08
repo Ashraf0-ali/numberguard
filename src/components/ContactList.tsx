@@ -5,17 +5,20 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useContacts, Contact } from '@/hooks/useContacts';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useSyncNotification } from '@/hooks/useSyncNotification';
 import ContactCard from './ContactCard';
 import ContactForm from './ContactForm';
 import AIStoryMode from './AIStoryMode';
-import { Search, Plus, Users, Brain } from 'lucide-react';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Search, Plus, Users, Brain, RefreshCw, Wifi, WifiOff } from 'lucide-react';
 
 const ContactList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
-  const { contacts, loading, deleteContact, searchContacts } = useContacts();
+  const { contacts, loading, deleteContact, searchContacts, isOnline, forceSync } = useContacts();
   const { language, t } = useLanguage();
+  const { hasSyncErrors } = useSyncNotification();
 
   const filteredContacts = searchContacts(searchTerm);
 
@@ -52,7 +55,42 @@ const ContactList = () => {
             </p>
           </div>
         </div>
+        
+        {/* Sync Status and Action */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={forceSync}
+            disabled={!isOnline}
+            className="flex items-center gap-1"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            {t('sync')}
+          </Button>
+          
+          <div className="flex items-center">
+            {isOnline ? (
+              <Wifi className="h-4 w-4 text-green-500" />
+            ) : (
+              <WifiOff className="h-4 w-4 text-red-500" />
+            )}
+          </div>
+        </div>
       </div>
+      
+      {/* Sync Error Alert */}
+      {hasSyncErrors && (
+        <Alert variant="destructive" className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+          <AlertTitle className="flex items-center gap-2">
+            <WifiOff className="h-4 w-4" />
+            Sync Error
+          </AlertTitle>
+          <AlertDescription className={language === 'bn' ? 'font-bangla' : 'font-inter'}>
+            Some changes couldn't be synced. They'll retry when connection improves.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Tabs for different modes */}
       <Tabs defaultValue="contacts" className="w-full">

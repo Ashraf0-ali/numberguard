@@ -1,21 +1,25 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { 
-  collection, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot,
-  serverTimestamp,
-  getDocs,
-  writeBatch
-} from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { 
+  loadContactsFromStorage,
+  saveContactsToStorage,
+  getOfflineQueue,
+  addToOfflineQueue,
+  saveOfflineQueue,
+  saveSyncError,
+  registerForSync
+} from '@/utils/storageUtils';
+import {
+  addContactToFirebase,
+  updateContactInFirebase,
+  deleteContactFromFirebase,
+  syncOfflineOperations,
+  setupContactsListener
+} from '@/utils/firebaseUtils';
+import { useSyncNotification } from '@/hooks/useSyncNotification';
 
 export interface Contact {
   id?: string;
@@ -24,19 +28,8 @@ export interface Contact {
   story?: string;
   tags?: string[];
   date_added?: string;
-  synced?: boolean; // Track if synced to Firebase
+  synced?: boolean;
 }
-
-interface OfflineOperation {
-  id: string;
-  type: 'add' | 'update' | 'delete';
-  contactId?: string;
-  contactData?: any;
-  timestamp: string;
-}
-
-const STORAGE_KEY = 'numberguard_contacts';
-const OFFLINE_QUEUE_KEY = 'numberguard_offline_queue';
 
 export const useContacts = () => {
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -44,15 +37,7 @@ export const useContacts = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const { toast } = useToast();
   const { user } = useAuth();
-
-  // Get user-specific storage keys
-  const getUserStorageKey = () => {
-    return user ? `${STORAGE_KEY}_${user.uid}` : STORAGE_KEY;
-  };
-
-  const getOfflineQueueKey = () => {
-    return user ? `${OFFLINE_QUEUE_KEY}_${user.uid}` : OFFLINE_QUEUE_KEY;
-  };
+  const { clearAllErrors } = useSyncNotification();
 
   // Online/Offline detection
   useEffect(() => {
@@ -62,6 +47,7 @@ export const useContacts = () => {
         title: "Back Online",
         description: "Syncing your data...",
       });
+      syncPendingOperations();
     };
 
     const handleOffline = () => {
@@ -82,94 +68,20 @@ export const useContacts = () => {
     };
   }, [toast]);
 
-  // Load contacts from localStorage
-  const loadFromLocalStorage = useCallback(() => {
-    try {
-      const stored = localStorage.getItem(getUserStorageKey());
-      if (stored) {
-        const parsedContacts = JSON.parse(stored);
-        const sortedContacts = parsedContacts.sort((a: Contact, b: Contact) => {
-          if (!a.date_added || !b.date_added) return 0;
-          return new Date(b.date_added).getTime() - new Date(a.date_added).getTime();
-        });
-        setContacts(sortedContacts);
+  // Attempt to sync when requested by service worker
+  useEffect(() => {
+    const handleAttemptSync = () => {
+      if (isOnline && user) {
+        syncPendingOperations();
       }
-    } catch (error) {
-      console.error('Error loading from localStorage:', error);
-    }
-  }, [user]);
-
-  // Save to localStorage
-  const saveToLocalStorage = useCallback((contactsToSave: Contact[]) => {
-    try {
-      localStorage.setItem(getUserStorageKey(), JSON.stringify(contactsToSave));
-    } catch (error) {
-      console.error('Error saving to localStorage:', error);
-    }
-  }, [user]);
-
-  // Add operation to offline queue
-  const addToOfflineQueue = useCallback((operation: Omit<OfflineOperation, 'id' | 'timestamp'>) => {
-    try {
-      const existingQueue = JSON.parse(localStorage.getItem(getOfflineQueueKey()) || '[]');
-      const newOperation: OfflineOperation = {
-        ...operation,
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        timestamp: new Date().toISOString()
-      };
-      existingQueue.push(newOperation);
-      localStorage.setItem(getOfflineQueueKey(), JSON.stringify(existingQueue));
-    } catch (error) {
-      console.error('Error adding to offline queue:', error);
-    }
-  }, [user]);
-
-  // Sync offline operations to Firebase
-  const syncOfflineOperations = useCallback(async () => {
-    if (!user || !isOnline) return;
-
-    try {
-      const offlineQueue: OfflineOperation[] = JSON.parse(localStorage.getItem(getOfflineQueueKey()) || '[]');
-      
-      if (offlineQueue.length === 0) return;
-
-      const batch = writeBatch(db);
-      
-      for (const operation of offlineQueue) {
-        if (operation.type === 'add') {
-          const contactRef = doc(collection(db, 'contacts'));
-          batch.set(contactRef, {
-            ...operation.contactData,
-            userId: user.uid,
-            date_added: serverTimestamp()
-          });
-        } else if (operation.type === 'update' && operation.contactId) {
-          const contactRef = doc(db, 'contacts', operation.contactId);
-          batch.update(contactRef, operation.contactData);
-        } else if (operation.type === 'delete' && operation.contactId) {
-          const contactRef = doc(db, 'contacts', operation.contactId);
-          batch.delete(contactRef);
-        }
-      }
-
-      await batch.commit();
-      
-      // Clear offline queue after successful sync
-      localStorage.removeItem(getOfflineQueueKey());
-      
-      toast({
-        title: "Sync Complete",
-        description: `${offlineQueue.length} operations synced successfully!`,
-      });
-    } catch (error) {
-      console.error('Error syncing offline operations:', error);
-      toast({
-        title: "Sync Error",
-        description: "Some changes couldn't be synced. They'll retry when connection improves.",
-        variant: "destructive",
-      });
-    }
-  }, [user, isOnline, toast]);
+    };
+    
+    window.addEventListener('attemptSync', handleAttemptSync);
+    
+    return () => {
+      window.removeEventListener('attemptSync', handleAttemptSync);
+    };
+  }, [isOnline, user]);
 
   // Load contacts on component mount and when user changes
   useEffect(() => {
@@ -179,78 +91,155 @@ export const useContacts = () => {
     }
 
     // Always load from localStorage first for instant display
-    loadFromLocalStorage();
+    const storedContacts = loadContactsFromStorage(user.uid);
+    setContacts(storedContacts);
 
     // If online, also setup Firebase listener and sync offline operations
     if (isOnline) {
       setLoading(true);
       
       // Sync any pending offline operations
-      syncOfflineOperations();
+      syncPendingOperations();
       
-      const contactsQuery = query(
-        collection(db, 'contacts'),
-        where('userId', '==', user.uid)
+      const unsubscribe = setupContactsListener(
+        db, 
+        user.uid,
+        (firebaseContacts) => {
+          // Merge Firebase and local contacts, prioritizing Firebase data
+          mergeContacts(firebaseContacts, storedContacts);
+          setLoading(false);
+        },
+        (error) => {
+          console.error('Error fetching from Firebase:', error);
+          setLoading(false);
+          // Continue with localStorage data on Firebase error
+        }
       );
-
-      const unsubscribe = onSnapshot(contactsQuery, (snapshot) => {
-        const firebaseContacts: Contact[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          firebaseContacts.push({
-            id: doc.id,
-            name: data.name,
-            number: data.number,
-            story: data.story,
-            tags: data.tags,
-            date_added: data.date_added?.toDate?.()?.toISOString() || data.date_added,
-            synced: true
-          });
-        });
-        
-        // Get current local contacts
-        const stored = localStorage.getItem(getUserStorageKey());
-        const localContacts: Contact[] = stored ? JSON.parse(stored) : [];
-        
-        // Merge Firebase and local contacts, prioritizing Firebase data
-        const contactMap = new Map();
-        
-        // Add Firebase contacts first
-        firebaseContacts.forEach(contact => {
-          contactMap.set(contact.id, contact);
-        });
-        
-        // Add local contacts that don't conflict with Firebase
-        localContacts.forEach(contact => {
-          if (!contactMap.has(contact.id)) {
-            contactMap.set(contact.id, contact);
-          }
-        });
-        
-        const mergedContacts = Array.from(contactMap.values()).sort((a, b) => {
-          if (!a.date_added || !b.date_added) return 0;
-          return new Date(b.date_added).getTime() - new Date(a.date_added).getTime();
-        });
-        
-        setContacts(mergedContacts);
-        saveToLocalStorage(mergedContacts);
-        setLoading(false);
-      }, (error) => {
-        console.error('Error fetching from Firebase:', error);
-        setLoading(false);
-        // Continue with localStorage data on Firebase error
-      });
 
       return () => unsubscribe();
     }
   }, [user, isOnline]);
 
-  // Sync when coming back online
-  useEffect(() => {
-    if (isOnline && user) {
-      syncOfflineOperations();
+  // Merge Firebase and local contacts
+  const mergeContacts = useCallback((firebaseContacts: Contact[], localContacts: Contact[]) => {
+    if (!user) return;
+    
+    // Create a map to efficiently merge contacts
+    const contactMap = new Map<string, Contact>();
+    
+    // Add Firebase contacts first (they take priority)
+    firebaseContacts.forEach(contact => {
+      if (contact.id) {
+        contactMap.set(contact.id, { ...contact, synced: true });
+      }
+    });
+    
+    // Add local contacts that don't conflict with Firebase
+    // or that are marked as not synced
+    localContacts.forEach(contact => {
+      if (contact.id && (!contactMap.has(contact.id) || !contact.synced)) {
+        contactMap.set(contact.id, contact);
+      }
+    });
+    
+    // Convert map back to array and sort by date
+    const mergedContacts = Array.from(contactMap.values()).sort((a, b) => {
+      if (!a.date_added || !b.date_added) return 0;
+      return new Date(b.date_added).getTime() - new Date(a.date_added).getTime();
+    });
+    
+    // Update state and localStorage
+    setContacts(mergedContacts);
+    saveContactsToStorage(mergedContacts, user.uid);
+  }, [user]);
+
+  // Sync offline operations to Firebase
+  const syncPendingOperations = useCallback(async () => {
+    if (!user || !isOnline) return;
+
+    try {
+      const offlineQueue = getOfflineQueue(user.uid);
+      
+      if (offlineQueue.length === 0) return;
+
+      // Sync operations to Firebase
+      const result = await syncOfflineOperations(db, user.uid, offlineQueue);
+      
+      // Handle successful syncs
+      if (result.success) {
+        // Update local contacts with new Firebase IDs if needed
+        const updatedContacts = [...contacts];
+        
+        for (const syncResult of result.syncedOperations) {
+          // If this was an add operation and we got a new Firebase ID
+          if (syncResult.operation.type === 'add' && syncResult.newId) {
+            // Find the local contact with the temp ID
+            const localContactIndex = updatedContacts.findIndex(
+              c => c.id === syncResult.operation.contactId
+            );
+            
+            if (localContactIndex >= 0) {
+              // Update the ID and mark as synced
+              updatedContacts[localContactIndex] = {
+                ...updatedContacts[localContactIndex],
+                id: syncResult.newId,
+                synced: true
+              };
+            }
+          }
+          
+          // For updates, mark the contact as synced
+          if (syncResult.operation.type === 'update') {
+            const localContactIndex = updatedContacts.findIndex(
+              c => c.id === syncResult.operation.contactId
+            );
+            
+            if (localContactIndex >= 0) {
+              updatedContacts[localContactIndex] = {
+                ...updatedContacts[localContactIndex],
+                synced: true
+              };
+            }
+          }
+        }
+        
+        // Save updated contacts
+        setContacts(updatedContacts);
+        saveContactsToStorage(updatedContacts, user.uid);
+        
+        // Clear the sync queue
+        saveOfflineQueue([], user.uid);
+        
+        // Clear any existing sync errors
+        clearAllErrors();
+        
+        toast({
+          title: "Sync Complete",
+          description: `${offlineQueue.length} changes synced successfully!`,
+        });
+      }
+    } catch (error) {
+      console.error('Error syncing offline operations:', error);
+      
+      // Mark operations with increased retry count
+      const offlineQueue = getOfflineQueue(user.uid);
+      const updatedQueue = offlineQueue.map(op => ({
+        ...op,
+        retryCount: (op.retryCount || 0) + 1
+      }));
+      
+      saveOfflineQueue(updatedQueue, user.uid);
+      
+      // Register for background sync
+      registerForSync();
+      
+      toast({
+        title: "Sync Error",
+        description: "Some changes couldn't be synced. They'll retry when connection improves.",
+        variant: "destructive",
+      });
     }
-  }, [isOnline, user, syncOfflineOperations]);
+  }, [user, isOnline, contacts, toast, clearAllErrors]);
 
   const addContact = useCallback(async (contactData: Omit<Contact, 'id' | 'date_added'>) => {
     if (!user) return;
@@ -268,44 +257,60 @@ export const useContacts = () => {
       // Always add to localStorage first
       const updatedContacts = [newContact, ...contacts];
       setContacts(updatedContacts);
-      saveToLocalStorage(updatedContacts);
+      saveContactsToStorage(updatedContacts, user.uid);
       
       if (isOnline) {
         // Try to add to Firebase immediately
         try {
-          await addDoc(collection(db, 'contacts'), {
-            ...contactData,
-            userId: user.uid,
-            date_added: serverTimestamp()
-          });
+          const result = await addContactToFirebase(db, user.uid, contactData);
           
-          // Mark as synced in localStorage
-          const syncedContact = { ...newContact, synced: true };
+          // Update with Firebase ID
+          const syncedContact = { ...newContact, id: result.id, synced: true };
           const syncedContacts = updatedContacts.map(c => 
             c.id === newContact.id ? syncedContact : c
           );
           setContacts(syncedContacts);
-          saveToLocalStorage(syncedContacts);
+          saveContactsToStorage(syncedContacts, user.uid);
+          
+          toast({
+            title: "Success",
+            description: "Contact added and synced!",
+          });
         } catch (error) {
-          // Add to offline queue if Firebase fails
-          addToOfflineQueue({
+          console.error('Error adding to Firebase:', error);
+          // Add to offline queue
+          const op = addToOfflineQueue({
             type: 'add',
+            contactId: newContact.id,
             contactData
+          }, user.uid);
+          
+          if (op) {
+            saveSyncError(error, op.id, user.uid);
+          }
+          
+          registerForSync();
+          
+          toast({
+            title: "Partial Success",
+            description: "Contact saved locally. Will sync when connection improves.",
+            variant: "default",
           });
         }
       } else {
         // Add to offline queue
         addToOfflineQueue({
           type: 'add',
+          contactId: newContact.id,
           contactData
+        }, user.uid);
+        
+        toast({
+          title: "Success",
+          description: "Contact saved offline. Will sync when online.",
         });
       }
-      
-      toast({
-        title: "Success",
-        description: isOnline ? "Contact added and synced!" : "Contact saved offline. Will sync when online.",
-      });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error adding contact:', error);
       toast({
         title: "Error",
@@ -330,39 +335,58 @@ export const useContacts = () => {
           : contact
       );
       setContacts(updatedContacts);
-      saveToLocalStorage(updatedContacts);
+      saveContactsToStorage(updatedContacts, user.uid);
       
       if (isOnline) {
         try {
-          const contactRef = doc(db, 'contacts', contactId);
-          await updateDoc(contactRef, contactData);
+          await updateContactInFirebase(db, contactId, contactData);
           
           // Mark as synced
           const syncedContacts = updatedContacts.map(c => 
             c.id === contactId ? { ...c, synced: true } : c
           );
           setContacts(syncedContacts);
-          saveToLocalStorage(syncedContacts);
+          saveContactsToStorage(syncedContacts, user.uid);
+          
+          toast({
+            title: "Success",
+            description: "Contact updated and synced!",
+          });
         } catch (error) {
-          addToOfflineQueue({
+          console.error('Error updating in Firebase:', error);
+          // Add to offline queue
+          const op = addToOfflineQueue({
             type: 'update',
             contactId,
             contactData
+          }, user.uid);
+          
+          if (op) {
+            saveSyncError(error, op.id, user.uid);
+          }
+          
+          registerForSync();
+          
+          toast({
+            title: "Partial Success",
+            description: "Contact updated locally. Will sync when connection improves.",
+            variant: "default",
           });
         }
       } else {
+        // Add to offline queue
         addToOfflineQueue({
           type: 'update',
           contactId,
           contactData
+        }, user.uid);
+        
+        toast({
+          title: "Success",
+          description: "Contact updated offline. Will sync when online.",
         });
       }
-      
-      toast({
-        title: "Success",
-        description: isOnline ? "Contact updated and synced!" : "Contact updated offline. Will sync when online.",
-      });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating contact:', error);
       toast({
         title: "Error",
@@ -383,30 +407,49 @@ export const useContacts = () => {
       // Remove from localStorage first
       const updatedContacts = contacts.filter(contact => contact.id !== contactId);
       setContacts(updatedContacts);
-      saveToLocalStorage(updatedContacts);
+      saveContactsToStorage(updatedContacts, user.uid);
       
       if (isOnline) {
         try {
-          const contactRef = doc(db, 'contacts', contactId);
-          await deleteDoc(contactRef);
+          await deleteContactFromFirebase(db, contactId);
+          
+          toast({
+            title: "Success",
+            description: "Contact deleted and synced!",
+          });
         } catch (error) {
-          addToOfflineQueue({
+          console.error('Error deleting from Firebase:', error);
+          // Add to offline queue
+          const op = addToOfflineQueue({
             type: 'delete',
             contactId
+          }, user.uid);
+          
+          if (op) {
+            saveSyncError(error, op.id, user.uid);
+          }
+          
+          registerForSync();
+          
+          toast({
+            title: "Partial Success",
+            description: "Contact deleted locally. Will sync when connection improves.",
+            variant: "default",
           });
         }
       } else {
+        // Add to offline queue
         addToOfflineQueue({
           type: 'delete',
           contactId
+        }, user.uid);
+        
+        toast({
+          title: "Success",
+          description: "Contact deleted offline. Will sync when online.",
         });
       }
-      
-      toast({
-        title: "Success",
-        description: isOnline ? "Contact deleted and synced!" : "Contact deleted offline. Will sync when online.",
-      });
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error deleting contact:', error);
       toast({
         title: "Error",
@@ -421,12 +464,32 @@ export const useContacts = () => {
   const searchContacts = useCallback((searchTerm: string) => {
     if (!searchTerm) return contacts;
     
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    
     return contacts.filter(contact => 
-      contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contact.name.toLowerCase().includes(lowerSearchTerm) ||
       contact.number.includes(searchTerm) ||
-      contact.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+      contact.tags?.some(tag => tag.toLowerCase().includes(lowerSearchTerm)) ||
+      contact.story?.toLowerCase().includes(lowerSearchTerm)
     );
   }, [contacts]);
+
+  // Force sync contacts
+  const forceSync = useCallback(() => {
+    if (user && isOnline) {
+      toast({
+        title: "Syncing",
+        description: "Attempting to sync your contacts...",
+      });
+      syncPendingOperations();
+    } else if (!isOnline) {
+      toast({
+        title: "Offline",
+        description: "Cannot sync while offline. Please check your connection.",
+        variant: "destructive",
+      });
+    }
+  }, [user, isOnline, syncPendingOperations, toast]);
 
   return {
     contacts,
@@ -436,6 +499,6 @@ export const useContacts = () => {
     updateContact,
     deleteContact,
     searchContacts,
-    refetch: loadFromLocalStorage
+    forceSync
   };
 };
