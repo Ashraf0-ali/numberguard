@@ -1,6 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  where, 
+  orderBy, 
+  onSnapshot,
+  serverTimestamp,
+  Timestamp 
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 export interface Contact {
   id?: string;
@@ -11,70 +25,66 @@ export interface Contact {
   date_added?: string;
 }
 
-const STORAGE_KEY = 'numberguard_contacts';
-
 export const useContacts = () => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Get user-specific storage key
-  const getUserStorageKey = () => {
-    return user ? `${STORAGE_KEY}_${user.uid}` : STORAGE_KEY;
-  };
-
-  // Load contacts from localStorage
-  const loadContacts = () => {
-    try {
-      const stored = localStorage.getItem(getUserStorageKey());
-      if (stored) {
-        const parsedContacts = JSON.parse(stored);
-        // Sort contacts by date_added in descending order
-        const sortedContacts = parsedContacts.sort((a: Contact, b: Contact) => {
-          if (!a.date_added || !b.date_added) return 0;
-          return new Date(b.date_added).getTime() - new Date(a.date_added).getTime();
-        });
-        setContacts(sortedContacts);
-      }
-    } catch (error) {
-      console.error('Error loading contacts:', error);
+  // Real-time listener for contacts
+  useEffect(() => {
+    if (!user) {
+      setContacts([]);
+      return;
     }
-  };
 
-  // Save contacts to localStorage
-  const saveContacts = (contactsToSave: Contact[]) => {
-    try {
-      localStorage.setItem(getUserStorageKey(), JSON.stringify(contactsToSave));
-    } catch (error) {
-      console.error('Error saving contacts:', error);
+    setLoading(true);
+    
+    const contactsQuery = query(
+      collection(db, 'contacts'),
+      where('userId', '==', user.uid),
+      orderBy('date_added', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(contactsQuery, (snapshot) => {
+      const contactsData: Contact[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        contactsData.push({
+          id: doc.id,
+          name: data.name,
+          number: data.number,
+          story: data.story,
+          tags: data.tags,
+          date_added: data.date_added?.toDate?.()?.toISOString() || data.date_added
+        });
+      });
+      setContacts(contactsData);
+      setLoading(false);
+    }, (error) => {
+      console.error('Error fetching contacts:', error);
+      setLoading(false);
       toast({
         title: "Error",
-        description: "Failed to save contacts",
+        description: "Failed to load contacts",
         variant: "destructive",
       });
-    }
-  };
+    });
 
-  const fetchContacts = () => {
-    setLoading(true);
-    loadContacts();
-    setLoading(false);
-  };
+    return () => unsubscribe();
+  }, [user, toast]);
 
-  const addContact = (contactData: Omit<Contact, 'id' | 'date_added'>) => {
+  const addContact = async (contactData: Omit<Contact, 'id' | 'date_added'>) => {
+    if (!user) return;
+
     try {
       setLoading(true);
       
-      const newContact: Contact = {
+      await addDoc(collection(db, 'contacts'), {
         ...contactData,
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-        date_added: new Date().toISOString()
-      };
-      
-      const updatedContacts = [newContact, ...contacts];
-      setContacts(updatedContacts);
-      saveContacts(updatedContacts);
+        userId: user.uid,
+        date_added: serverTimestamp()
+      });
       
       toast({
         title: "Success",
@@ -92,18 +102,14 @@ export const useContacts = () => {
     }
   };
 
-  const updateContact = (contactId: string, contactData: Partial<Contact>) => {
+  const updateContact = async (contactId: string, contactData: Partial<Contact>) => {
+    if (!user) return;
+
     try {
       setLoading(true);
       
-      const updatedContacts = contacts.map(contact => 
-        contact.id === contactId 
-          ? { ...contact, ...contactData }
-          : contact
-      );
-      
-      setContacts(updatedContacts);
-      saveContacts(updatedContacts);
+      const contactRef = doc(db, 'contacts', contactId);
+      await updateDoc(contactRef, contactData);
       
       toast({
         title: "Success",
@@ -121,18 +127,14 @@ export const useContacts = () => {
     }
   };
 
-  const deleteContact = (contactId: string) => {
-    console.log('deleteContact called with ID:', contactId);
-    console.log('Current contacts:', contacts);
-    
+  const deleteContact = async (contactId: string) => {
+    if (!user) return;
+
     try {
       setLoading(true);
       
-      const updatedContacts = contacts.filter(contact => contact.id !== contactId);
-      console.log('Updated contacts after filter:', updatedContacts);
-      
-      setContacts(updatedContacts);
-      saveContacts(updatedContacts);
+      const contactRef = doc(db, 'contacts', contactId);
+      await deleteDoc(contactRef);
       
       toast({
         title: "Success",
@@ -149,14 +151,6 @@ export const useContacts = () => {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (user) {
-      loadContacts();
-    } else {
-      setContacts([]);
-    }
-  }, [user]);
 
   const searchContacts = (searchTerm: string) => {
     if (!searchTerm) return contacts;
@@ -175,6 +169,6 @@ export const useContacts = () => {
     updateContact,
     deleteContact,
     searchContacts,
-    refetch: fetchContacts
+    refetch: () => {} // Not needed with real-time listener
   };
 };
