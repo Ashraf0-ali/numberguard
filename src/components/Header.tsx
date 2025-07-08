@@ -4,13 +4,16 @@ import { Button } from '@/components/ui/button';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/hooks/useAuth';
-import { Shield, Moon, Sun, Globe, LogOut } from 'lucide-react';
+import { useContacts } from '@/hooks/useContacts';
+import { Shield, Moon, Sun, Globe, LogOut, Wifi, WifiOff } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
 
 const Header = () => {
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const { logout } = useAuth();
+  const { isOnline } = useContacts();
 
   return (
     <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 sticky top-0 z-50">
@@ -31,6 +34,24 @@ const Header = () => {
           </div>
           
           <div className="flex items-center gap-2">
+            {/* Online/Offline Status */}
+            <Badge 
+              variant={isOnline ? "default" : "destructive"}
+              className="flex items-center gap-1 h-6 px-2 text-xs"
+            >
+              {isOnline ? (
+                <>
+                  <Wifi className="h-3 w-3" />
+                  Online
+                </>
+              ) : (
+                <>
+                  <WifiOff className="h-3 w-3" />
+                  Offline
+                </>
+              )}
+            </Badge>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
