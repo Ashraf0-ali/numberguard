@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Contact } from '@/hooks/useContacts';
-import { Phone, User, Calendar, Edit, Trash2 } from 'lucide-react';
+import { Phone, User, Calendar, Edit, Trash2, PhoneCall } from 'lucide-react';
 
 interface ContactCardProps {
   contact: Contact;
@@ -28,6 +28,10 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) 
       return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
     }
     return number;
+  };
+
+  const handleCall = () => {
+    window.location.href = `tel:${contact.number}`;
   };
 
   return (
@@ -56,6 +60,14 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) 
           </div>
           
           <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ml-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleCall}
+              className="h-5 w-5 p-0 hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-300 hover:text-green-600 border-gray-300 dark:border-gray-600"
+            >
+              <PhoneCall className="h-2.5 w-2.5" />
+            </Button>
             <Button
               size="sm"
               variant="outline"
