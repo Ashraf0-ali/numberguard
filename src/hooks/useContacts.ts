@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 export interface Contact {
   id?: string;
@@ -16,11 +17,17 @@ export const useContacts = () => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  // Get user-specific storage key
+  const getUserStorageKey = () => {
+    return user ? `${STORAGE_KEY}_${user.uid}` : STORAGE_KEY;
+  };
 
   // Load contacts from localStorage
   const loadContacts = () => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem(getUserStorageKey());
       if (stored) {
         const parsedContacts = JSON.parse(stored);
         // Sort contacts by date_added in descending order
@@ -38,7 +45,7 @@ export const useContacts = () => {
   // Save contacts to localStorage
   const saveContacts = (contactsToSave: Contact[]) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(contactsToSave));
+      localStorage.setItem(getUserStorageKey(), JSON.stringify(contactsToSave));
     } catch (error) {
       console.error('Error saving contacts:', error);
       toast({
@@ -139,8 +146,12 @@ export const useContacts = () => {
   };
 
   useEffect(() => {
-    loadContacts();
-  }, []);
+    if (user) {
+      loadContacts();
+    } else {
+      setContacts([]);
+    }
+  }, [user]);
 
   const searchContacts = (searchTerm: string) => {
     if (!searchTerm) return contacts;

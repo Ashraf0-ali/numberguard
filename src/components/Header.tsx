@@ -3,12 +3,14 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Shield, Moon, Sun, Globe } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { Shield, Moon, Sun, Globe, LogOut } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const Header = () => {
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
+  const { logout } = useAuth();
 
   return (
     <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 sticky top-0 z-50">
@@ -63,6 +65,15 @@ const Header = () => {
               ) : (
                 <Moon className="h-3.5 w-3.5" />
               )}
+            </Button>
+
+            <Button
+              onClick={logout}
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+            >
+              <LogOut className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
