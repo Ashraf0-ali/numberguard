@@ -31,14 +31,41 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) 
   };
 
   const handleCall = () => {
-    // Always use tel: protocol for mobile dial pad
-    window.location.href = `tel:${contact.number}`;
+    console.log('Call button clicked for:', contact.number);
+    // Try multiple methods for better mobile app compatibility
+    try {
+      // Method 1: Direct tel: protocol (works in most mobile apps)
+      window.location.href = `tel:${contact.number}`;
+    } catch (error) {
+      console.error('Error with tel: protocol:', error);
+      // Method 2: Try using window.open as fallback
+      try {
+        window.open(`tel:${contact.number}`, '_system');
+      } catch (error2) {
+        console.error('Error with window.open:', error2);
+        // Method 3: Try creating a link element and clicking it
+        const link = document.createElement('a');
+        link.href = `tel:${contact.number}`;
+        link.click();
+      }
+    }
   };
 
-  const handleDelete = () => {
+  const handleDelete = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
     console.log('Delete button clicked for contact:', contact.id);
-    if (contact.id) {
-      onDelete(contact.id);
+    console.log('onDelete function:', onDelete);
+    
+    if (contact.id && onDelete) {
+      try {
+        onDelete(contact.id);
+        console.log('Delete function called successfully');
+      } catch (error) {
+        console.error('Error calling delete function:', error);
+      }
+    } else {
+      console.log('Missing contact.id or onDelete function');
     }
   };
 
@@ -67,7 +94,7 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) 
             )}
           </div>
           
-          <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ml-1">
+          <div className="flex gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 ml-1">
             <Button
               size="sm"
               variant="outline"
