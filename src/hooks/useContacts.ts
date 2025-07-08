@@ -190,8 +190,7 @@ export const useContacts = () => {
       
       const contactsQuery = query(
         collection(db, 'contacts'),
-        where('userId', '==', user.uid),
-        orderBy('date_added', 'desc')
+        where('userId', '==', user.uid)
       );
 
       const unsubscribe = onSnapshot(contactsQuery, (snapshot) => {
