@@ -9,7 +9,7 @@ const banglishToBanglaMap: Record<string, string> = {
   'panch': 'পাঁচ', '5': '৫', 'pach': 'পাঁচ',
   'choy': 'ছয়', '6': '৬', 'choi': 'ছয়',
   'saat': 'সাত', '7': '৭', 'sat': 'সাত',
-  'aat': 'আট', '8': '৮', 'at': 'আট',
+  'aat': 'আট', '8': '৮', 'aat8': 'আট',
   'noy': 'নয়', '9': '৯', 'noi': 'নয়',
   'dosh': 'দশ', '10': '১০', 'dos': 'দশ',
   
@@ -53,7 +53,7 @@ const banglishToBanglaMap: Record<string, string> = {
   'bhai': 'ভাই', 'apu': 'আপু', 'bon': 'বোন', 'mama bhai': 'মামা ভাই',
   'khala moni': 'খালা মনি', 'chacha mia': 'চাচা মিয়া', 'fupu amma': 'ফুপু আম্মা',
   'amma': 'আম্মা', 'abbu': 'আব্বু', 'ma': 'মা', 'baba': 'বাবা',
-  'khala': 'খালা', 'nana bhai': 'নানা ভাই', 'nani ma': 'নানী মা',
+  'khala2': 'খালা', 'nana bhai': 'নানা ভাই', 'nani ma': 'নানী মা',
   'dada bhai': 'দাদা ভাই', 'dadi ma': 'দাদী মা', 'mama ji': 'মামা জি',
   'chacha ji': 'চাচা জি', 'khala ji': 'খালা জি', 'fupu ji': 'ফুপু জি',
   'vai': 'ভাই', 'apa': 'আপা', 'apni': 'আপনি', 'apnara': 'আপনারা',
