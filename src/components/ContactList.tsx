@@ -7,6 +7,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useSyncNotification } from '@/hooks/useSyncNotification';
 import ContactCard from './ContactCard';
 import ContactForm from './ContactForm';
+import ContactDetailPopup from './ContactDetailPopup';
 import AIStoryMode from './AIStoryMode';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Search, Plus, Users, Brain, RefreshCw, Wifi, WifiOff } from 'lucide-react';
@@ -16,6 +17,8 @@ const ContactList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [isDetailPopupOpen, setIsDetailPopupOpen] = useState(false);
   const { contacts, loading, deleteContact, searchContacts, isOnline, forceSync } = useContacts();
   const { language, t } = useLanguage();
   const { hasSyncErrors } = useSyncNotification();
@@ -33,9 +36,19 @@ const ContactList = () => {
     }
   };
 
+  const handleViewDetails = (contact: Contact) => {
+    setSelectedContact(contact);
+    setIsDetailPopupOpen(true);
+  };
+
   const handleCloseForm = () => {
     setIsFormOpen(false);
     setEditingContact(null);
+  };
+
+  const handleCloseDetailPopup = () => {
+    setIsDetailPopupOpen(false);
+    setSelectedContact(null);
   };
 
   return (
@@ -151,6 +164,7 @@ const ContactList = () => {
                       contact={contact}
                       onEdit={handleEditContact}
                       onDelete={handleDeleteContact}
+                      onViewDetails={handleViewDetails}
                     />
                   ))}
                 </div>
@@ -193,6 +207,15 @@ const ContactList = () => {
         isOpen={isFormOpen}
         onClose={handleCloseForm}
         contact={editingContact}
+      />
+
+      {/* Contact Detail Popup */}
+      <ContactDetailPopup
+        contact={selectedContact}
+        isOpen={isDetailPopupOpen}
+        onClose={handleCloseDetailPopup}
+        onEdit={handleEditContact}
+        onDelete={handleDeleteContact}
       />
     </div>
   );
