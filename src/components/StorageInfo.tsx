@@ -25,7 +25,7 @@ const StorageInfo = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const isHeavy = storageSize > 50; // More than 50KB is considered heavy
+  const isHeavy = storageSize > 50;
 
   return (
     <div className="space-y-4">
