@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,6 +19,7 @@ import {
   setupContactsListener
 } from '@/utils/firebaseUtils';
 import { useSyncNotification } from '@/hooks/useSyncNotification';
+import { searchWithBanglishSupport } from '@/utils/banglishConverter';
 
 export interface Contact {
   id?: string;
@@ -461,16 +461,15 @@ export const useContacts = () => {
     }
   }, [user, contacts, isOnline, toast]);
 
+  // Enhanced search with Banglish support
   const searchContacts = useCallback((searchTerm: string) => {
     if (!searchTerm) return contacts;
     
-    const lowerSearchTerm = searchTerm.toLowerCase();
-    
     return contacts.filter(contact => 
-      contact.name.toLowerCase().includes(lowerSearchTerm) ||
-      contact.number.includes(searchTerm) ||
-      contact.tags?.some(tag => tag.toLowerCase().includes(lowerSearchTerm)) ||
-      contact.story?.toLowerCase().includes(lowerSearchTerm)
+      searchWithBanglishSupport(contact.name, searchTerm) ||
+      searchWithBanglishSupport(contact.number, searchTerm) ||
+      (contact.story && searchWithBanglishSupport(contact.story, searchTerm)) ||
+      contact.tags?.some(tag => searchWithBanglishSupport(tag, searchTerm))
     );
   }, [contacts]);
 
