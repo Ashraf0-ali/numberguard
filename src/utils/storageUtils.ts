@@ -1,4 +1,5 @@
 import { Contact } from '@/hooks/useContacts';
+import { compressContact, decompressContact } from './storageCompression';
 
 export const STORAGE_KEY_PREFIX = 'numberguard_contacts';
 export const OFFLINE_QUEUE_KEY_PREFIX = 'numberguard_offline_queue';
@@ -17,33 +18,7 @@ export const getSyncErrorKey = (userId?: string) => {
   return userId ? `${SYNC_ERROR_KEY_PREFIX}_${userId}` : SYNC_ERROR_KEY_PREFIX;
 };
 
-// Compress contact data for storage
-const compressContact = (contact: Contact): any => {
-  return {
-    i: contact.id,
-    n: contact.name,
-    num: contact.number,
-    s: contact.story || '',
-    t: contact.tags || [],
-    d: contact.date_added || '',
-    sy: contact.synced || false
-  };
-};
-
-// Decompress contact data from storage
-const decompressContact = (compressed: any): Contact => {
-  return {
-    id: compressed.i,
-    name: compressed.n,
-    number: compressed.num,
-    story: compressed.s,
-    tags: compressed.t,
-    date_added: compressed.d,
-    synced: compressed.sy
-  };
-};
-
-// Load contacts from localStorage with compression
+// Load contacts from localStorage with ultra-compression
 export const loadContactsFromStorage = (userId?: string): Contact[] => {
   try {
     const stored = localStorage.getItem(getUserStorageKey(userId));
@@ -62,11 +37,16 @@ export const loadContactsFromStorage = (userId?: string): Contact[] => {
   }
 };
 
-// Save contacts to localStorage with compression
+// Save contacts to localStorage with ultra-compression
 export const saveContactsToStorage = (contacts: Contact[], userId?: string) => {
   try {
     const compressed = contacts.map(compressContact);
-    localStorage.setItem(getUserStorageKey(userId), JSON.stringify(compressed));
+    const jsonString = JSON.stringify(compressed);
+    
+    // Log storage size for debugging
+    console.log(`Saving ${contacts.length} contacts, compressed size: ${Math.round(jsonString.length / 1024 * 100) / 100} KB`);
+    
+    localStorage.setItem(getUserStorageKey(userId), jsonString);
     return true;
   } catch (error) {
     console.error('Error saving to localStorage:', error);
@@ -127,28 +107,28 @@ export const addToOfflineQueue = (
   }
 };
 
-// Save sync errors with cleanup
+// Save sync errors with ultra-compression
 export const saveSyncError = (error: any, operationId: string, userId?: string) => {
   try {
     const errorKey = getSyncErrorKey(userId);
     const existingErrors = JSON.parse(localStorage.getItem(errorKey) || '{}');
     
-    // Keep only last 10 errors to prevent storage bloat
+    // Keep only last 5 errors to prevent storage bloat
     const errorKeys = Object.keys(existingErrors);
-    if (errorKeys.length >= 10) {
+    if (errorKeys.length >= 5) {
       const sortedKeys = errorKeys.sort((a, b) => {
-        const aTime = existingErrors[a].timestamp || '0';
-        const bTime = existingErrors[b].timestamp || '0';
+        const aTime = existingErrors[a].t || '0';
+        const bTime = existingErrors[b].t || '0';
         return aTime.localeCompare(bTime);
       });
       // Remove oldest errors
-      sortedKeys.slice(0, errorKeys.length - 9).forEach(key => {
+      sortedKeys.slice(0, errorKeys.length - 4).forEach(key => {
         delete existingErrors[key];
       });
     }
     
     existingErrors[operationId] = {
-      m: error.message || 'Unknown error',
+      m: (error.message || 'Unknown error').substring(0, 100), // Limit error message length
       t: new Date().toISOString(),
       o: operationId
     };
@@ -197,15 +177,15 @@ export const getSyncErrors = (userId?: string) => {
   }
 };
 
-// Clean up old data periodically
+// Aggressive cleanup - remove everything older than 3 days
 export const cleanupStorage = (userId?: string) => {
   try {
-    // Clean offline queue of very old items (older than 7 days)
+    // Clean offline queue of old items (older than 3 days)
     const queue = getOfflineQueue(userId);
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
     const cleanQueue = queue.filter(op => {
       const opDate = new Date(op.timestamp);
-      return opDate > sevenDaysAgo;
+      return opDate > threeDaysAgo;
     });
     
     if (cleanQueue.length !== queue.length) {
@@ -213,13 +193,8 @@ export const cleanupStorage = (userId?: string) => {
       console.log(`Cleaned ${queue.length - cleanQueue.length} old offline operations`);
     }
     
-    // Clean old sync errors (already limited to 10 in saveSyncError)
-    const errors = getSyncErrors(userId);
-    const errorKeys = Object.keys(errors);
-    if (errorKeys.length > 10) {
-      clearSyncErrors(userId);
-      console.log('Cleaned old sync errors');
-    }
+    // Always clean sync errors to keep them minimal
+    clearSyncErrors(userId);
     
   } catch (error) {
     console.error('Error during storage cleanup:', error);
@@ -230,7 +205,6 @@ export const cleanupStorage = (userId?: string) => {
 export const registerForSync = () => {
   if ('serviceWorker' in navigator && 'SyncManager' in window) {
     navigator.serviceWorker.ready.then(registration => {
-      // Send message to service worker to register for sync
       navigator.serviceWorker.controller?.postMessage({
         type: 'REGISTER_SYNC'
       });
@@ -238,7 +212,7 @@ export const registerForSync = () => {
   }
 };
 
-// Get storage size estimate
+// Get storage size estimate (simplified)
 export const getStorageSize = () => {
   try {
     let total = 0;
@@ -247,7 +221,7 @@ export const getStorageSize = () => {
         total += localStorage[key].length;
       }
     }
-    return Math.round(total / 1024); // Return size in KB
+    return Math.round(total / 1024 * 100) / 100; // Return size in KB with 2 decimals
   } catch (error) {
     console.error('Error calculating storage size:', error);
     return 0;
