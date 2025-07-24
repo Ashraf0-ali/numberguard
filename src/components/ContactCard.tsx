@@ -10,9 +10,10 @@ interface ContactCardProps {
   contact: Contact;
   onEdit: (contact: Contact) => void;
   onDelete: (contactId: string) => void;
+  onViewDetails: (contact: Contact) => void;
 }
 
-const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) => {
+const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete, onViewDetails }) => {
   const formatDate = (timestamp: any) => {
     if (!timestamp) return '';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -31,33 +32,27 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) 
   };
 
   const handleCall = (e: React.MouseEvent) => {
-    // Prevent default behavior and stop propagation
     e.preventDefault();
     e.stopPropagation();
     
     console.log('Call button clicked for:', contact.number);
     
-    // Clean the phone number
     const phoneNumber = contact.number.replace(/\s+/g, '');
     
-    // Try multiple methods to initiate a call for better cross-platform compatibility
     try {
-      // Method 1: Direct link approach
       const link = document.createElement('a');
       link.href = `tel:${phoneNumber}`;
-      link.setAttribute('target', '_system'); // for mobile apps
+      link.setAttribute('target', '_system');
       document.body.appendChild(link);
       link.click();
       setTimeout(() => document.body.removeChild(link), 100);
       
-      // Method 2: Window location approach (fallback)
       setTimeout(() => {
         if (window.location.href.indexOf('tel:') === -1) {
           window.location.href = `tel:${phoneNumber}`;
         }
       }, 200);
       
-      // Method 3: Window open approach (second fallback)
       setTimeout(() => {
         window.open(`tel:${phoneNumber}`, '_system');
       }, 300);
@@ -69,13 +64,11 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) 
   };
 
   const handleDelete = (e: React.MouseEvent) => {
-    // Prevent default behavior and stop propagation
     e.preventDefault();
     e.stopPropagation();
     
     console.log('Delete button clicked for contact:', contact.id);
     
-    // Confirm before deleting
     if (window.confirm(`Are you sure you want to delete ${contact.name}?`)) {
       if (contact.id && onDelete) {
         try {
@@ -92,8 +85,15 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) 
     }
   };
 
+  const handleCardClick = () => {
+    onViewDetails(contact);
+  };
+
   return (
-    <Card className="group hover:shadow-lg transition-all duration-200 hover:scale-[1.01] border border-gray-200/50 dark:border-gray-700/50 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl">
+    <Card 
+      className="group hover:shadow-lg transition-all duration-200 hover:scale-[1.01] border border-gray-200/50 dark:border-gray-700/50 bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm rounded-xl cursor-pointer"
+      onClick={handleCardClick}
+    >
       <CardContent className="p-3">
         <div className="flex justify-between items-start mb-2">
           <div className="flex-1 min-w-0">
@@ -117,7 +117,6 @@ const ContactCard: React.FC<ContactCardProps> = ({ contact, onEdit, onDelete }) 
             )}
           </div>
           
-          {/* Always show buttons on mobile and desktop */}
           <div className="flex gap-0.5 opacity-100 transition-opacity duration-200 ml-1 z-10">
             <Button
               size="sm"
