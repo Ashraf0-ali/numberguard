@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { getStorageSize } from '@/utils/storageUtils';
+import { calculateStorageSize } from '@/utils/storageCompression';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { HardDrive, Settings } from 'lucide-react';
@@ -16,7 +16,8 @@ const StorageInfo = () => {
 
   useEffect(() => {
     const updateStorageSize = () => {
-      setStorageSize(getStorageSize());
+      const { totalKB } = calculateStorageSize();
+      setStorageSize(totalKB);
     };
     
     updateStorageSize();
@@ -34,7 +35,7 @@ const StorageInfo = () => {
           <div className="flex items-center gap-2">
             <HardDrive className={`h-4 w-4 ${isHeavy ? 'text-red-500' : 'text-gray-500'}`} />
             <span className={`text-sm ${isHeavy ? 'text-red-600 font-medium' : 'text-gray-600'}`}>
-              Storage: {storageSize} KB {isHeavy && '(Heavy!)'}
+              Storage: {storageSize.toFixed(2)} KB {isHeavy && '(Heavy!)'}
             </span>
           </div>
           <div className="flex gap-2">
