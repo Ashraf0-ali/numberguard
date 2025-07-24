@@ -9,7 +9,8 @@ import {
   addToOfflineQueue,
   saveOfflineQueue,
   saveSyncError,
-  registerForSync
+  registerForSync,
+  cleanupStorage
 } from '@/utils/storageUtils';
 import {
   addContactToFirebase,
@@ -89,6 +90,9 @@ export const useContacts = () => {
       setContacts([]);
       return;
     }
+
+    // Cleanup storage periodically
+    cleanupStorage(user.uid);
 
     // Always load from localStorage first for instant display
     const storedContacts = loadContactsFromStorage(user.uid);

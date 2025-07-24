@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import ContactForm from './ContactForm';
 import AIStoryMode from './AIStoryMode';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Search, Plus, Users, Brain, RefreshCw, Wifi, WifiOff } from 'lucide-react';
+import StorageInfo from './StorageInfo';
 
 const ContactList = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -78,6 +78,9 @@ const ContactList = () => {
           </div>
         </div>
       </div>
+      
+      {/* Storage Info */}
+      <StorageInfo />
       
       {/* Sync Error Alert */}
       {hasSyncErrors && (
